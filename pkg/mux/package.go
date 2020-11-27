@@ -9,6 +9,6 @@ import (
 // NewServeMux create new http service
 func NewServeMux(opts *Options) *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.Handle("/graphql", proxy.NewHTTPProxy(opts.PostgraphileAddr))
+	mux.Handle("/graphql", proxy.New(opts.PostgraphileAddr))
 	return mux
 }

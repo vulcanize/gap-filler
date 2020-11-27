@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -14,10 +15,16 @@ var (
 		Use:     "proxy",
 		Version: version,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			addr := fmt.Sprintf("%s:%s", viper.GetString("http.host"), viper.GetString("http.port"))
+			postgraphileAddr, err := url.Parse(viper.GetString("postgraphile"))
+			if err != nil {
+				return err
+			}
+
 			router := mux.NewServeMux(&mux.Options{
-				PostgraphileAddr: viper.GetString("postgraphile"),
+				PostgraphileAddr: postgraphileAddr,
 			})
+
+			addr := fmt.Sprintf("%s:%s", viper.GetString("http.host"), viper.GetString("http.port"))
 			return http.ListenAndServe(addr, router)
 		},
 	}

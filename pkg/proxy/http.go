@@ -3,26 +3,27 @@ package proxy
 import (
 	"io"
 	"net/http"
+	"net/url"
 )
 
-// HTTPProxy proxy handler
-type HTTPProxy struct {
+// HTTPReverseProxy it work with a regular HTTP request
+type HTTPReverseProxy struct {
 	http.Handler
 
-	addr   string
+	addr   *url.URL
 	client *http.Client
 }
 
-// NewHTTPProxy create new http-proxy-handler
-func NewHTTPProxy(addr string) *HTTPProxy {
-	return &HTTPProxy{
+// NewHTTPReverseProxy create new http-proxy-handler
+func NewHTTPReverseProxy(addr *url.URL) *HTTPReverseProxy {
+	return &HTTPReverseProxy{
 		addr:   addr,
 		client: new(http.Client),
 	}
 }
 
-func (handler *HTTPProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	req, err := http.NewRequest("POST", handler.addr, r.Body)
+func (handler *HTTPReverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	req, err := http.NewRequest("POST", handler.addr.String(), r.Body)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
