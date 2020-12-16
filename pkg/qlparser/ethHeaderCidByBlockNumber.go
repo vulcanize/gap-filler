@@ -42,7 +42,7 @@ func EthHeaderCidByBlockNumberArg(input io.Reader) (*big.Int, *int, error) {
 			if !ok {
 				continue
 			}
-			if field.Name.Value != "ethHeaderCidByBlockNumber" && len(field.Arguments) != 1 {
+			if field.Name.Value != "ethHeaderCidByBlockNumber" || len(field.Arguments) != 1 {
 				continue
 			}
 			n, ok = new(big.Int).SetString(field.Arguments[0].Value.GetValue().(string), 10)
