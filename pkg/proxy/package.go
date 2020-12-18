@@ -3,6 +3,8 @@ package proxy
 import (
 	"net/http"
 	"net/url"
+
+	"github.com/ethereum/go-ethereum/rpc"
 )
 
 // Proxy accept http and ws requests
@@ -14,11 +16,11 @@ type Proxy struct {
 }
 
 // New create new router
-func New(addr *url.URL) *Proxy {
+func New(addr *url.URL, rpc *rpc.Client) *Proxy {
 	return &Proxy{
 		addr:      addr,
 		wsProxy:   NewWebsocketReverseProxy(addr),
-		httpProxy: NewHTTPReverseProxy(addr),
+		httpProxy: NewHTTPReverseProxy(addr, rpc),
 	}
 }
 

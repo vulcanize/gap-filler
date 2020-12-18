@@ -2,6 +2,8 @@ package proxy
 
 import (
 	"bytes"
+	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"math/big"
@@ -9,6 +11,8 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/ethereum/go-ethereum/statediff"
 	"github.com/sirupsen/logrus"
 	"github.com/valyala/fastjson"
 	"github.com/vulcanize/gap-filler-service/pkg/qlparser"
@@ -18,15 +22,17 @@ import (
 type HTTPReverseProxy struct {
 	target *url.URL
 	client *http.Client
+	rpc    *rpc.Client
 }
 
 // NewHTTPReverseProxy create new http-proxy-handler
-func NewHTTPReverseProxy(target *url.URL) *HTTPReverseProxy {
+func NewHTTPReverseProxy(target *url.URL, rpc *rpc.Client) *HTTPReverseProxy {
 	return &HTTPReverseProxy{
 		target: target,
 		client: &http.Client{
 			Timeout: 15 * time.Second,
 		},
+		rpc: rpc,
 	}
 }
 
@@ -73,6 +79,30 @@ func (handler *HTTPReverseProxy) isEmptyData(rawJSON []byte) (bool, error) {
 
 func (handler *HTTPReverseProxy) doReqToGethStateDiff(n *big.Int) error {
 	logrus.WithField("blockNum", n).Debug("do request to geth")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	var data json.RawMessage
+	params := statediff.Params{
+		IntermediateStateNodes:   true,
+		IntermediateStorageNodes: true,
+		IncludeBlock:             true,
+		IncludeReceipts:          true,
+		IncludeTD:                true,
+		IncludeCode:              true,
+	}
+	log := logrus.WithFields(logrus.Fields{
+		"n":      n,
+		"params": params,
+	})
+	log.Debug("call statediff_stateDiffAt")
+	if err := handler.rpc.CallContext(ctx, &data, "statediff_stateDiffAt", n.Uint64(), params); err != nil {
+		log.WithError(err).Debug("bad statediff_stateDiffAt request")
+		return err
+	}
+	log.WithField("resp", data).Debug("statediff_stateDiffAt result")
+
 	return nil
 }
 
@@ -110,7 +140,7 @@ func (handler *HTTPReverseProxy) pullData(body []byte) ([]byte, error) {
 
 	select {
 	case <-time.After(15 * time.Second):
-		return nil, fmt.Errorf("pooling timeout")
+		return nil, fmt.Errorf("pulling timeout")
 	case resp := <-datach:
 		return resp.data, resp.err
 	}
@@ -155,7 +185,11 @@ func (handler *HTTPReverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	handler.doReqToGethStateDiff(blockNum)
+	if err := handler.doReqToGethStateDiff(blockNum); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	data, err = handler.pullData(body)
 	if err != nil {
 		logrus.WithError(err).Debug("have error after pulling")

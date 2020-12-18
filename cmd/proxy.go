@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -24,10 +25,16 @@ var (
 				return err
 			}
 
+			rpcClient, err := rpc.Dial(viper.GetString("eth.rpc"))
+			if err != nil {
+				return err
+			}
+
 			router, err := mux.NewServeMux(&mux.Options{
 				PostgraphileAddr: postgraphileAddr,
 				BasePath:         viper.GetString("http.path"),
 				EnableGraphiQL:   viper.GetBool("gql.gui"),
+				RPCClient:        rpcClient,
 			})
 			if err != nil {
 				logrus.Info(err)
@@ -48,6 +55,8 @@ func init() {
 	proxyCmd.PersistentFlags().String("http-port", "8080", "http port")
 	proxyCmd.PersistentFlags().String("http-path", "/", "http base path")
 
+	proxyCmd.PersistentFlags().String("eth-rpc", "http://127.0.0.1:8545", "ethereum rpc address")
+
 	proxyCmd.PersistentFlags().String("gql-target", "http://127.0.0.1:5020/graphql", "postgraphile address")
 	proxyCmd.PersistentFlags().Bool("gql-gui", false, "enable graphiql interface")
 
@@ -55,6 +64,8 @@ func init() {
 	viper.BindPFlag("http.host", proxyCmd.PersistentFlags().Lookup("http-host"))
 	viper.BindPFlag("http.port", proxyCmd.PersistentFlags().Lookup("http-port"))
 	viper.BindPFlag("http.path", proxyCmd.PersistentFlags().Lookup("http-path"))
+
+	viper.BindPFlag("eth.rpc", proxyCmd.PersistentFlags().Lookup("eth-rpc"))
 
 	viper.BindPFlag("gql.target", proxyCmd.PersistentFlags().Lookup("gql-target"))
 	viper.BindPFlag("gql.gui", proxyCmd.PersistentFlags().Lookup("gql-gui"))
