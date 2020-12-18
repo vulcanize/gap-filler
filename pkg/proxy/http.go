@@ -97,11 +97,11 @@ func (handler *HTTPReverseProxy) doReqToGethStateDiff(n *big.Int) error {
 		"params": params,
 	})
 	log.Debug("call statediff_stateDiffAt")
-	if err := handler.rpc.CallContext(ctx, &data, "statediff_stateDiffAt", n.Uint64(), params); err != nil {
-		log.WithError(err).Debug("bad statediff_stateDiffAt request")
+	if err := handler.rpc.CallContext(ctx, &data, "statediff_writeStateDiffAt", n.Uint64(), params); err != nil {
+		log.WithError(err).Debug("bad statediff_writeStateDiffAt request")
 		return err
 	}
-	log.WithField("resp", data).Debug("statediff_stateDiffAt result")
+	log.WithField("resp", data).Debug("statediff_writeStateDiffAt result")
 
 	return nil
 }
@@ -159,7 +159,7 @@ func (handler *HTTPReverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Reques
 
 	data, err := handler.doReqToPostgraphile(body)
 	if err != nil {
-		logrus.WithError(err).Debug("postgraphile first request request")
+		logrus.WithError(err).Error("postgraphile first request request")
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -177,26 +177,26 @@ func (handler *HTTPReverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Reques
 
 	isEmpty, err := handler.isEmptyData(data)
 	if err != nil {
-		logrus.WithError(err).Debug("can't check data")
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		logrus.WithError(err).Warn("can't check data")
 	}
-	if !isEmpty {
+	if !isEmpty || err != nil {
 		logrus.WithField("data", string(data)).Debug("data have a some body")
 		w.Write(data)
 		return
 	}
 
 	if err := handler.doReqToGethStateDiff(blockNum); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		logrus.WithError(err).Error("cant call geth stateDiff")
+		w.Write(data)
 		return
 	}
 
-	data, err = handler.pullData(r, body)
+	pulledData, err := handler.pullData(r, body)
 	if err != nil {
-		logrus.WithError(err).Debug("have error after pulling")
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		logrus.WithError(err).Error("have error after pulling")
+		w.Write(data)
 		return
 	}
-	w.Write(data)
+
+	w.Write(pulledData)
 }
