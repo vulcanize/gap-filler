@@ -2,8 +2,6 @@ package qlparser
 
 import (
 	"fmt"
-	"io"
-	"io/ioutil"
 	"math/big"
 
 	"github.com/graphql-go/graphql/language/ast"
@@ -12,23 +10,16 @@ import (
 )
 
 // EthHeaderCidByBlockNumberArg detect graphql query `ethHeaderCidByBlockNumber`
-func EthHeaderCidByBlockNumberArg(input io.Reader) (*big.Int, *int, error) {
-	body, err := ioutil.ReadAll(input)
-	if err != nil {
-		return nil, nil, err
-	}
+func EthHeaderCidByBlockNumberArg(query []byte) (*big.Int, error) {
 	doc, err := parser.Parse(parser.ParseParams{
 		Source: source.NewSource(&source.Source{
-			Body: body,
+			Body: query,
 		}),
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	var (
-		n *big.Int = nil
-		s *int     = nil
-	)
+	var n *big.Int = nil
 	for i := range doc.Definitions {
 		if doc.Definitions[i].GetKind() != "OperationDefinition" {
 			continue
@@ -47,13 +38,12 @@ func EthHeaderCidByBlockNumberArg(input io.Reader) (*big.Int, *int, error) {
 			}
 			n, ok = new(big.Int).SetString(field.Arguments[0].Value.GetValue().(string), 10)
 			if !ok {
-				return nil, nil, fmt.Errorf("bad argument")
+				return nil, fmt.Errorf("bad argument")
 			}
-			s = &j
 		}
 		if n != nil {
 			break
 		}
 	}
-	return n, s, nil
+	return n, nil
 }

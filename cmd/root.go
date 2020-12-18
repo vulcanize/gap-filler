@@ -13,14 +13,18 @@ var (
 	rootCmd       = &cobra.Command{
 		Use:     "gapfiller",
 		Version: version,
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			return nil
-		},
 	}
 )
 
 func init() {
 	cobra.OnInitialize(func() {
+		loglevel, err := logrus.ParseLevel(viper.GetString("log.level"))
+		if err == nil {
+			logrus.SetLevel(loglevel)
+		}
+		logrus.SetFormatter(&logrus.TextFormatter{
+			FullTimestamp: viper.GetBool("log.timestamp"),
+		})
 		if configs == "" {
 			logrus.Warn("no config file passed with --config flag")
 			return
@@ -31,6 +35,7 @@ func init() {
 		} else {
 			logrus.WithError(err).Fatal("couldn't read config file")
 		}
+
 	})
 
 	rootCmd.PersistentFlags().StringVar(&configs, "config", "", "config file location")
@@ -52,10 +57,6 @@ func init() {
 	viper.BindPFlag("metrics", rootCmd.PersistentFlags().Lookup("metrics"))
 	viper.BindPFlag("metrics.host", rootCmd.PersistentFlags().Lookup("metrics-host"))
 	viper.BindPFlag("metrics.port", rootCmd.PersistentFlags().Lookup("metrics-port"))
-
-	logrus.SetFormatter(&logrus.TextFormatter{
-		FullTimestamp: viper.GetBool("log.timestamp"),
-	})
 }
 
 // Execute main function

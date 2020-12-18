@@ -9,16 +9,16 @@ import (
 type Proxy struct {
 	addr *url.URL
 
-	wsProxy *WebsocketReverseProxy
-	htProxy *HTTPReverseProxy
+	wsProxy   http.Handler
+	httpProxy http.Handler
 }
 
 // New create new router
 func New(addr *url.URL) *Proxy {
 	return &Proxy{
-		addr:    addr,
-		wsProxy: NewWebsocketReverseProxy(addr),
-		htProxy: NewHTTPReverseProxy(addr),
+		addr:      addr,
+		wsProxy:   NewWebsocketReverseProxy(addr),
+		httpProxy: NewHTTPReverseProxy(addr),
 	}
 }
 
@@ -27,7 +27,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if IsWebSocketRequest(r) {
 		proxy = p.wsProxy
 	} else {
-		proxy = p.htProxy
+		proxy = p.httpProxy
 	}
 	proxy.ServeHTTP(w, r)
 }

@@ -2,17 +2,13 @@ package qlparser
 
 import (
 	"math/big"
-	"strings"
 	"testing"
 )
 
 func TestEthHeaderCidByBlockNumberArgEmptyBody(t *testing.T) {
-	n, i, err := EthHeaderCidByBlockNumberArg(strings.NewReader(``))
+	n, err := EthHeaderCidByBlockNumberArg([]byte(``))
 	if n != nil {
 		t.Errorf("Want: nil, Got: %v", n)
-	}
-	if i != nil {
-		t.Errorf("Want: nil, Got: %v", i)
 	}
 	if err != nil {
 		t.Errorf("Want: nil, Got: %v", err)
@@ -20,7 +16,7 @@ func TestEthHeaderCidByBlockNumberArgEmptyBody(t *testing.T) {
 }
 
 func TestEthHeaderCidByBlockNumberArgNoQuery(t *testing.T) {
-	n, i, err := EthHeaderCidByBlockNumberArg(strings.NewReader(`
+	n, err := EthHeaderCidByBlockNumberArg([]byte(`
 		query MyQuery {
 			ethHeaderCid(nodeId: "")
 		}	
@@ -28,25 +24,19 @@ func TestEthHeaderCidByBlockNumberArgNoQuery(t *testing.T) {
 	if n != nil {
 		t.Errorf("Want: nil, Got: %v", n)
 	}
-	if i != nil {
-		t.Errorf("Want: nil, Got: %v", i)
-	}
 	if err != nil {
 		t.Errorf("Want: nil, Got: %v", err)
 	}
 }
 
 func TestEthHeaderCidByBlockNumberArgNoArg(t *testing.T) {
-	n, i, err := EthHeaderCidByBlockNumberArg(strings.NewReader(`
+	n, err := EthHeaderCidByBlockNumberArg([]byte(`
 		query MyQuery {
 			ethHeaderCidByBlockNumber
 		}	
 	`))
 	if n != nil {
 		t.Errorf("Want: nil, Got: %v", n)
-	}
-	if i != nil {
-		t.Errorf("Want: nil, Got: %v", i)
 	}
 	if err != nil {
 		t.Errorf("Want: nil, Got: %v", err)
@@ -75,12 +65,9 @@ func TestEthHeaderCidByBlockNumberArgSimple(t *testing.T) {
 		`,
 	}
 	for _, query := range queries {
-		n, i, err := EthHeaderCidByBlockNumberArg(strings.NewReader(query))
+		n, err := EthHeaderCidByBlockNumberArg([]byte(query))
 		if n == nil || n.Cmp(big.NewInt(100000)) != 0 {
 			t.Errorf("Want: 100000, Got: %s", n)
-		}
-		if i == nil || (*i != 0) {
-			t.Errorf("Want: nil, Got: %v", *i)
 		}
 		if err != nil {
 			t.Errorf("Want: nil, Got: %v", err)
@@ -111,7 +98,6 @@ func TestEthHeaderCidByBlockNumberArgMixedQueries(t *testing.T) {
 			}
 		`,
 		N: big.NewInt(999),
-		I: 1,
 	}
 	queries[1] = query{
 		Source: `
@@ -130,16 +116,12 @@ func TestEthHeaderCidByBlockNumberArgMixedQueries(t *testing.T) {
 			}
 		`,
 		N: big.NewInt(555),
-		I: 2,
 	}
 
 	for j, query := range queries {
-		n, i, err := EthHeaderCidByBlockNumberArg(strings.NewReader(query.Source))
+		n, err := EthHeaderCidByBlockNumberArg([]byte(query.Source))
 		if n == nil || n.Cmp(query.N) != 0 {
 			t.Errorf("[%d] Want: %s, Got: %s", j, query.N, n)
-		}
-		if i == nil || (*i != query.I) {
-			t.Errorf("[%d] Want: %v, Got: %v", j, query.I, *i)
 		}
 		if err != nil {
 			t.Errorf("[%d] Want: nil, Got: %v", j, err)
