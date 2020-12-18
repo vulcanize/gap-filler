@@ -106,7 +106,7 @@ func (handler *HTTPReverseProxy) doReqToGethStateDiff(n *big.Int) error {
 	return nil
 }
 
-func (handler *HTTPReverseProxy) pullData(body []byte) ([]byte, error) {
+func (handler *HTTPReverseProxy) pullData(r *http.Request, body []byte) ([]byte, error) {
 	type response struct {
 		data []byte
 		err  error
@@ -139,6 +139,8 @@ func (handler *HTTPReverseProxy) pullData(body []byte) ([]byte, error) {
 	}(datach, ticker)
 
 	select {
+	case <-r.Context().Done():
+		return nil, nil
 	case <-time.After(15 * time.Second):
 		return nil, fmt.Errorf("pulling timeout")
 	case resp := <-datach:
@@ -190,7 +192,7 @@ func (handler *HTTPReverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	data, err = handler.pullData(body)
+	data, err = handler.pullData(r, body)
 	if err != nil {
 		logrus.WithError(err).Debug("have error after pulling")
 		http.Error(w, err.Error(), http.StatusBadRequest)
