@@ -7,6 +7,7 @@ import (
 	"github.com/graphql-go/graphql/language/ast"
 	"github.com/graphql-go/graphql/language/parser"
 	"github.com/graphql-go/graphql/language/source"
+	"github.com/valyala/fastjson"
 )
 
 // EthHeaderCidByBlockNumberArg detect graphql query `ethHeaderCidByBlockNumber`
@@ -46,4 +47,24 @@ func EthHeaderCidByBlockNumberArg(query []byte) (*big.Int, error) {
 		}
 	}
 	return n, nil
+}
+
+// IsHaveEthHeaderCidByBlockNumberData check response is not empty
+func IsHaveEthHeaderCidByBlockNumberData(data []byte) (bool, error) {
+	json, err := fastjson.ParseBytes(data)
+	if err != nil {
+		return true, err
+	}
+
+	edges := json.Get("data", "ethHeaderCidByBlockNumber", "edges")
+	if edges == nil {
+		return true, nil
+	}
+
+	aEdges, err := edges.Array()
+	if err != nil {
+		return true, err
+	}
+
+	return len(aEdges) == 0, nil
 }

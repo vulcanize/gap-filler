@@ -23,128 +23,28 @@ type HTTPReverseProxy struct {
 	target *url.URL
 	client *http.Client
 	rpc    *rpc.Client
+
+	isEmptyData      func(data []byte) (bool, error)
+	req2postgraphile func(client *http.Client, uri *url.URL, body []byte) ([]byte, error)
+	req2statediff    func(rpc *rpc.Client, n *big.Int) error
+
+	datapuller func(r *http.Request, body []byte) ([]byte, error)
 }
 
 // NewHTTPReverseProxy create new http-proxy-handler
 func NewHTTPReverseProxy(target *url.URL, rpc *rpc.Client) *HTTPReverseProxy {
+	client := &http.Client{
+		Timeout: 15 * time.Second,
+	}
 	return &HTTPReverseProxy{
 		target: target,
-		client: &http.Client{
-			Timeout: 15 * time.Second,
-		},
-		rpc: rpc,
-	}
-}
+		client: client,
+		rpc:    rpc,
 
-func (handler *HTTPReverseProxy) doReqToPostgraphile(body []byte) ([]byte, error) {
-	req, err := http.NewRequest("POST", handler.target.String(), bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-
-	res, err := handler.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	data, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-
-	return data, nil
-}
-
-func (handler *HTTPReverseProxy) isEmptyData(rawJSON []byte) (bool, error) {
-	json, err := fastjson.ParseBytes(rawJSON)
-	if err != nil {
-		return false, err
-	}
-
-	edges := json.Get("data", "ethHeaderCidByBlockNumber", "edges")
-	if edges == nil {
-		return true, nil
-	}
-
-	aEdges, err := edges.Array()
-	if err != nil {
-		return false, err
-	}
-
-	return len(aEdges) == 0, nil
-}
-
-func (handler *HTTPReverseProxy) doReqToGethStateDiff(n *big.Int) error {
-	logrus.WithField("blockNum", n).Debug("do request to geth")
-
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
-	var data json.RawMessage
-	params := statediff.Params{
-		IntermediateStateNodes:   true,
-		IntermediateStorageNodes: true,
-		IncludeBlock:             true,
-		IncludeReceipts:          true,
-		IncludeTD:                true,
-		IncludeCode:              true,
-	}
-	log := logrus.WithFields(logrus.Fields{
-		"n":      n,
-		"params": params,
-	})
-	log.Debug("call statediff_stateDiffAt")
-	if err := handler.rpc.CallContext(ctx, &data, "statediff_writeStateDiffAt", n.Uint64(), params); err != nil {
-		log.WithError(err).Debug("bad statediff_writeStateDiffAt request")
-		return err
-	}
-	log.WithField("resp", data).Debug("statediff_writeStateDiffAt result")
-
-	return nil
-}
-
-func (handler *HTTPReverseProxy) pullData(r *http.Request, body []byte) ([]byte, error) {
-	type response struct {
-		data []byte
-		err  error
-	}
-	datach := make(chan response, 1)
-	ticker := time.NewTicker(200 * time.Millisecond)
-	defer ticker.Stop()
-
-	go func(ch chan response, tick *time.Ticker) {
-		for now := range tick.C {
-			logrus.WithField("ticker", now).Debug("trying to pull data")
-			data, err := handler.doReqToPostgraphile(body)
-			if err != nil {
-				logrus.WithField("now", now).WithError(err).Debug("have error after request to postgql")
-				ch <- response{err: err}
-				return
-			}
-			isEmpty, err := handler.isEmptyData(data)
-			if err != nil {
-				logrus.WithField("now", now).WithError(err).Debug("have error response parsing")
-				ch <- response{err: err}
-				return
-			}
-			if !isEmpty {
-				logrus.WithField("now", now).WithField("data", string(data)).Debug("have some response")
-				ch <- response{data: data}
-				return
-			}
-		}
-	}(datach, ticker)
-
-	select {
-	case <-r.Context().Done():
-		return nil, nil
-	case <-time.After(15 * time.Second):
-		return nil, fmt.Errorf("pulling timeout")
-	case resp := <-datach:
-		return resp.data, resp.err
+		isEmptyData:      qlparser.IsHaveEthHeaderCidByBlockNumberData,
+		req2postgraphile: req2postgraphile,
+		req2statediff:    req2statediff,
+		datapuller:       datapuller(client, target),
 	}
 }
 
@@ -157,7 +57,7 @@ func (handler *HTTPReverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	defer r.Body.Close()
 	logrus.WithField("body", string(body)).Debug("new request")
 
-	data, err := handler.doReqToPostgraphile(body)
+	data, err := handler.req2postgraphile(handler.client, handler.target, body)
 	if err != nil {
 		logrus.WithError(err).Error("postgraphile first request request")
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -185,13 +85,13 @@ func (handler *HTTPReverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if err := handler.doReqToGethStateDiff(blockNum); err != nil {
+	if err := handler.req2statediff(handler.rpc, blockNum); err != nil {
 		logrus.WithError(err).Error("cant call geth stateDiff")
 		w.Write(data)
 		return
 	}
 
-	pulledData, err := handler.pullData(r, body)
+	pulledData, err := handler.datapuller(r, body)
 	if err != nil {
 		logrus.WithError(err).Error("have error after pulling")
 		w.Write(data)
@@ -199,4 +99,99 @@ func (handler *HTTPReverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	}
 
 	w.Write(pulledData)
+}
+
+func req2postgraphile(client *http.Client, uri *url.URL, body []byte) ([]byte, error) {
+	req, err := http.NewRequest("POST", uri.String(), bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	res, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	return data, nil
+}
+
+func req2statediff(rpc *rpc.Client, n *big.Int) error {
+	logrus.WithField("blockNum", n).Debug("do request to geth")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	var data json.RawMessage
+	params := statediff.Params{
+		IntermediateStateNodes:   true,
+		IntermediateStorageNodes: true,
+		IncludeBlock:             true,
+		IncludeReceipts:          true,
+		IncludeTD:                true,
+		IncludeCode:              true,
+	}
+	log := logrus.WithFields(logrus.Fields{
+		"n":      n,
+		"params": params,
+	})
+	log.Debug("call statediff_stateDiffAt")
+	if err := rpc.CallContext(ctx, &data, "statediff_writeStateDiffAt", n.Uint64(), params); err != nil {
+		log.WithError(err).Debug("bad statediff_writeStateDiffAt request")
+		return err
+	}
+	log.WithField("resp", data).Debug("statediff_writeStateDiffAt result")
+
+	return nil
+}
+
+func datapuller(client *http.Client, uri *url.URL) func(r *http.Request, body []byte) ([]byte, error) {
+	return func(r *http.Request, body []byte) ([]byte, error) {
+		type response struct {
+			data []byte
+			err  error
+		}
+		datach := make(chan response, 1)
+		ticker := time.NewTicker(200 * time.Millisecond)
+		defer ticker.Stop()
+
+		go func(ch chan response, tick *time.Ticker) {
+			for now := range tick.C {
+				logrus.WithField("ticker", now).Debug("trying to pull data")
+				data, err := req2postgraphile(client, uri, body)
+				if err != nil {
+					logrus.WithField("now", now).WithError(err).Debug("have error after request to postgql")
+					ch <- response{err: err}
+					return
+				}
+				isEmpty, err := qlparser.IsHaveEthHeaderCidByBlockNumberData(data)
+				if err != nil {
+					logrus.WithField("now", now).WithError(err).Debug("have error response parsing")
+					ch <- response{err: err}
+					return
+				}
+				if !isEmpty {
+					logrus.WithField("now", now).WithField("data", string(data)).Debug("have some response")
+					ch <- response{data: data}
+					return
+				}
+			}
+		}(datach, ticker)
+
+		select {
+		case <-r.Context().Done():
+			return nil, nil
+		case <-time.After(15 * time.Second):
+			return nil, fmt.Errorf("pulling timeout")
+		case resp := <-datach:
+			return resp.data, resp.err
+		}
+	}
 }
