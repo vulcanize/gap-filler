@@ -12,7 +12,7 @@ endif
 ifneq ($(shell git status --porcelain),)
     VERSION := $(VERSION)-dirty
 endif
-LDFLAGS := -ldflags "-w -s -X 'github.com/vulcanize/gap-filler-service/cmd.version=$(VERSION)'"
+LDFLAGS := -ldflags "-w -s -X 'github.com/vulcanize/gap-filler/cmd.version=$(VERSION)'"
 
 all: clean test linux darwin windows
 
@@ -26,15 +26,15 @@ test:
 
 linux:
 	if [ ! -d "build" ]; then mkdir "build"; fi
-	GOOS=linux GOARCH=amd64 go build ${LDFLAGS} -o build/gapfiller-linux-${COMMIT}
+	GOOS=linux GOARCH=amd64 go build ${LDFLAGS} -o build/gap-filler-linux
 
 darwin:
 	if [ ! -d "build" ]; then mkdir "build"; fi
-	GOOS=darwin GOARCH=amd64 go build ${LDFLAGS} -o build/gapfiller-darwin-${COMMIT}
+	GOOS=darwin GOARCH=amd64 go build ${LDFLAGS} -o build/gapfiller-darwin
 
 windows:
 	if [ ! -d "build" ]; then mkdir "build"; fi
-	GOOS=windows GOARCH=amd64 go build ${LDFLAGS} -o build/gapfiller-windows-${COMMIT}
+	GOOS=windows GOARCH=amd64 go build ${LDFLAGS} -o build/gapfiller-windows
 
 ## Build docker image
 .PHONY: docker-build
