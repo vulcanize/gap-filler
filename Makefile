@@ -35,3 +35,8 @@ darwin:
 windows:
 	if [ ! -d "build" ]; then mkdir "build"; fi
 	GOOS=windows GOARCH=amd64 go build ${LDFLAGS} -o build/gapfiller-windows-${COMMIT}
+
+## Build docker image
+.PHONY: docker-build
+docker-build:
+	docker build -t vulcanize/gap-filler -f Dockerfile .
