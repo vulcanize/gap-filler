@@ -1,4 +1,4 @@
-module github.com/vulcanize/gap-filler-service
+module github.com/vulcanize/gap-filler
 
 go 1.15
 

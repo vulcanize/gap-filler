@@ -9,13 +9,12 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/vulcanize/gap-filler-service/pkg/mux"
+	"github.com/vulcanize/gap-filler/pkg/mux"
 )
 
 var (
 	proxyCmd = &cobra.Command{
-		Use:     "proxy",
-		Version: version,
+		Use: "proxy",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			fmt.Println()
 		},

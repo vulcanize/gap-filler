@@ -13,8 +13,8 @@ RUN make linux
 FROM alpine
 
 # keep binaries immutable
-COPY --from=builder /go/src/github.com/vulcanize/gap-filler/build/gap-filler-linux gap-filler
+COPY --from=builder /go/src/github.com/vulcanize/gap-filler/build/gap-filler-linux /usr/local/bin/gap-filler
 
 EXPOSE 8080
 
-ENTRYPOINT ["/app/gap-filler"]
+ENTRYPOINT ["gap-filler"]

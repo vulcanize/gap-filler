@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/sirupsen/logrus"
-	"github.com/vulcanize/gap-filler-service/cmd"
+	"github.com/vulcanize/gap-filler/cmd"
 )
 
 func main() {

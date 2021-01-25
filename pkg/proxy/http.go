@@ -15,7 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/statediff"
 	"github.com/sirupsen/logrus"
 	"github.com/valyala/fastjson"
-	"github.com/vulcanize/gap-filler-service/pkg/qlparser"
+	"github.com/vulcanize/gap-filler/pkg/qlparser"
 )
 
 // HTTPReverseProxy it work with a regular HTTP request
