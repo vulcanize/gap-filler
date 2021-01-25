@@ -12,7 +12,7 @@ endif
 ifneq ($(shell git status --porcelain),)
     VERSION := $(VERSION)-dirty
 endif
-LDFLAGS := -ldflags "-w -s -X 'github.com/vulcanize/gap-filler/cmd.version=$(VERSION)'"
+LDFLAGS := -ldflags "-X 'github.com/vulcanize/gap-filler/cmd.version=$(VERSION)'"
 
 all: clean test linux darwin windows
 

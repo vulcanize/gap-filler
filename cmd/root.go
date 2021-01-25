@@ -4,15 +4,13 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"strings"
 )
 
 var (
-	version       string
-	configs       string
-	fullTimestamp bool
-	rootCmd       = &cobra.Command{
-		Use:     "gapfiller",
-		Version: version,
+	config  string
+	rootCmd = &cobra.Command{
+		Use: "gapfiller",
 	}
 )
 
@@ -25,11 +23,11 @@ func init() {
 		logrus.SetFormatter(&logrus.TextFormatter{
 			FullTimestamp: viper.GetBool("log.timestamp"),
 		})
-		if configs == "" {
+		if config == "" {
 			logrus.Warn("no config file passed with --config flag")
 			return
 		}
-		viper.SetConfigFile(configs)
+		viper.SetConfigFile(config)
 		if err := viper.ReadInConfig(); err == nil {
 			logrus.WithField("config", viper.ConfigFileUsed()).Info("using config file")
 		} else {
@@ -38,7 +36,10 @@ func init() {
 
 	})
 
-	rootCmd.PersistentFlags().StringVar(&configs, "config", "", "config file location")
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
+	viper.AutomaticEnv()
+
+	rootCmd.PersistentFlags().StringVar(&config, "config", "", "config file location")
 
 	// flags
 	rootCmd.PersistentFlags().String("log-level", logrus.InfoLevel.String(), "log level (trace, debug, info, warn, error, fatal, panic)")
@@ -61,6 +62,6 @@ func init() {
 
 // Execute main function
 func Execute() error {
-	logrus.Info("----- Starting gap-filler-service -----")
+	logrus.Info("----- Starting gap-filler -----")
 	return rootCmd.Execute()
 }

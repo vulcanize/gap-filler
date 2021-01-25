@@ -5,7 +5,7 @@ import (
 	"path"
 
 	"github.com/friendsofgo/graphiql"
-	"github.com/vulcanize/gap-filler-service/pkg/proxy"
+	"github.com/vulcanize/gap-filler/pkg/proxy"
 )
 
 // NewServeMux create new http service
