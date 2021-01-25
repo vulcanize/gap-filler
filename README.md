@@ -12,6 +12,10 @@ After building the binary, run as
 
 `./gap-filler proxy`
 
+## Supported GraphQL Queries
+
+* `ethHeaderCidByBlockNumber`
+
 ## Environment Variables
 
 | Name        | Default Value      | Comment                     |
