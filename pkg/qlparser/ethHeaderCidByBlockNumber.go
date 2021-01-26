@@ -56,12 +56,27 @@ func IsHaveEthHeaderCidByBlockNumberData(data []byte) (bool, error) {
 		return true, err
 	}
 
-	edges := json.Get("data", "ethHeaderCidByBlockNumber", "edges")
-	if edges == nil {
+	header := json.Get("data", "ethHeaderCidByBlockNumber")
+	if header == nil {
 		return true, nil
 	}
 
-	aEdges, err := edges.Array()
+	// can contain nodes or header
+	var arrValue *fastjson.Value
+	nodes := header.Get("nodes")
+	if nodes == nil {
+		// check edges
+		edges := header.Get("edges")
+		if edges == nil {
+			return true, nil
+		}
+
+		arrValue = edges
+	} else {
+		arrValue = nodes
+	}
+
+	aEdges, err := arrValue.Array()
 	if err != nil {
 		return true, err
 	}
