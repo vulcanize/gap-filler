@@ -10,19 +10,32 @@ import (
 
 // Proxy accept http and ws requests
 type Proxy struct {
-	addr *url.URL
-
 	wsProxy   http.Handler
 	httpProxy http.Handler
 }
 
+type PostgraphileOptions struct {
+	Default    *url.URL
+	TracingAPI *url.URL
+}
+
+type RPCOptions struct {
+	Default *rpc.Client
+	Tracing *rpc.Client
+}
+
+type Options struct {
+	Postgraphile PostgraphileOptions
+	RPC          RPCOptions
+}
+
 // New create new router
-func New(addr *url.URL, rpc *rpc.Client) *Proxy {
+func New(opts *Options) *Proxy {
 	return &Proxy{
-		addr:    addr,
-		wsProxy: NewWebsocketReverseProxy(addr),
-		httpProxy: NewHTTPReverseProxy(addr).
-			Register(qlservices.NewEthHeaderCidByBlockNumberService(rpc)),
+		wsProxy: NewWebsocketReverseProxy(opts.Postgraphile.Default),
+		httpProxy: NewHTTPReverseProxy(opts).
+			Register(qlservices.NewEthHeaderCidByBlockNumberService(opts.RPC.Default)).
+			Register(qlservices.NewGetGraphCallByTxHashService(opts.RPC.Tracing)),
 	}
 }
 

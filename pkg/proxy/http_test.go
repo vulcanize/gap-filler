@@ -26,7 +26,7 @@ func (srv *EthHeaderCidByBlockNumberMockService) Do(args []*ast.Argument) error 
 }
 
 func TestEthHeaderCidByBlockNumberEmptyBody(t *testing.T) {
-	proxy := NewHTTPReverseProxy(nil)
+	proxy := NewHTTPReverseProxy(&Options{})
 	proxy.forward = func(body []byte) ([]byte, error) {
 		return []byte("some response"), nil
 	}
@@ -65,7 +65,7 @@ func TestEthHeaderCidByBlockNumberSimple(t *testing.T) {
 			}
 		}
 	`
-	proxy := NewHTTPReverseProxy(nil)
+	proxy := NewHTTPReverseProxy(&Options{})
 	proxy.forward = func(body []byte) ([]byte, error) {
 		return []byte(json), nil
 	}
@@ -105,7 +105,7 @@ func TestEthHeaderCidByBlockNumberDataPulling(t *testing.T) {
 		}
 	`
 
-	proxy := NewHTTPReverseProxy(nil)
+	proxy := NewHTTPReverseProxy(&Options{})
 	servi := NewEthHeaderCidByBlockNumberMockService()
 	proxy.Register(servi)
 	proxy.forward = func(body []byte) ([]byte, error) {

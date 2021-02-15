@@ -20,7 +20,16 @@ func NewServeMux(opts *Options) (*http.ServeMux, error) {
 		mux.Handle(path.Join(opts.BasePath, "/graphiql"), grphiql)
 	}
 
-	mux.Handle(path.Join(opts.BasePath, "/graphql"), proxy.New(opts.PostgraphileAddr, opts.RPCClient))
+	mux.Handle(path.Join(opts.BasePath, "/graphql"), proxy.New(&proxy.Options{
+		RPC: proxy.RPCOptions{
+			Default: opts.RPC.Default,
+			Tracing: opts.RPC.Tracing,
+		},
+		Postgraphile: proxy.PostgraphileOptions{
+			Default:    opts.Postgraphile.Default,
+			TracingAPI: opts.Postgraphile.TracingAPI,
+		},
+	}))
 
 	return mux, nil
 }

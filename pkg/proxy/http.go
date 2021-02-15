@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 
 	"github.com/graphql-go/graphql/language/ast"
@@ -23,27 +24,31 @@ type Service interface {
 
 // HTTPReverseProxy it work with a regular HTTP request
 type HTTPReverseProxy struct {
-	target       *url.URL
-	client       *http.Client
-	forward      func(body []byte) ([]byte, error)
-	polling      func(r *http.Request, body []byte, names []string) ([]byte, error)
+	tgDefault *url.URL
+	tgTracing *url.URL
+	client    *http.Client
+	forward   func(body []byte) ([]byte, error)
+	polling   func(r *http.Request, body []byte, names []string) ([]byte, error)
+
+	mu           sync.Mutex
 	serviceNames []string
 	services     map[string]Service
 }
 
 // NewHTTPReverseProxy create new http-proxy-handler
-func NewHTTPReverseProxy(target *url.URL) *HTTPReverseProxy {
+func NewHTTPReverseProxy(opts *Options) *HTTPReverseProxy {
 	client := &http.Client{
 		Timeout: 15 * time.Second,
 	}
 	proxy := HTTPReverseProxy{
-		target:       target,
+		tgDefault:    opts.Postgraphile.Default,
+		tgTracing:    opts.Postgraphile.TracingAPI,
 		client:       client,
 		serviceNames: make([]string, 0),
 		services:     make(map[string]Service),
 	}
 	proxy.forward = func(body []byte) ([]byte, error) {
-		req, err := http.NewRequest("POST", proxy.target.String(), bytes.NewReader(body))
+		req, err := http.NewRequest("POST", proxy.tgDefault.String(), bytes.NewReader(body))
 		if err != nil {
 			return nil, err
 		}
@@ -114,6 +119,9 @@ func NewHTTPReverseProxy(target *url.URL) *HTTPReverseProxy {
 
 // Register new service
 func (handler *HTTPReverseProxy) Register(srv Service) *HTTPReverseProxy {
+	handler.mu.Lock()
+	defer handler.mu.Unlock()
+
 	handler.serviceNames = append(handler.serviceNames, srv.Name())
 	handler.services[srv.Name()] = srv
 	return handler
