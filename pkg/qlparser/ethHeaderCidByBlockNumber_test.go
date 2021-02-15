@@ -1,6 +1,7 @@
 package qlparser
 
 import (
+	"errors"
 	"math/big"
 	"testing"
 )
@@ -10,8 +11,8 @@ func TestEthHeaderCidByBlockNumberArgEmptyBody(t *testing.T) {
 	if n != nil {
 		t.Errorf("Want: nil, Got: %v", n)
 	}
-	if err != nil {
-		t.Errorf("Want: nil, Got: %v", err)
+	if !errors.Is(ErrNotFound, err) {
+		t.Errorf("Want: ErrNotFound, Got: %v", err)
 	}
 }
 
@@ -24,8 +25,8 @@ func TestEthHeaderCidByBlockNumberArgNoQuery(t *testing.T) {
 	if n != nil {
 		t.Errorf("Want: nil, Got: %v", n)
 	}
-	if err != nil {
-		t.Errorf("Want: nil, Got: %v", err)
+	if !errors.Is(ErrNotFound, err) {
+		t.Errorf("Want: ErrNotFound, Got: %v", err)
 	}
 }
 
@@ -38,7 +39,7 @@ func TestEthHeaderCidByBlockNumberArgNoArg(t *testing.T) {
 	if n != nil {
 		t.Errorf("Want: nil, Got: %v", n)
 	}
-	if err != nil {
+	if !errors.Is(ErrNotFound, err) {
 		t.Errorf("Want: nil, Got: %v", err)
 	}
 }

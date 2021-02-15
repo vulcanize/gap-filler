@@ -5,6 +5,7 @@ import (
 	"net/url"
 
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/vulcanize/gap-filler/pkg/qlservices"
 )
 
 // Proxy accept http and ws requests
@@ -18,9 +19,10 @@ type Proxy struct {
 // New create new router
 func New(addr *url.URL, rpc *rpc.Client) *Proxy {
 	return &Proxy{
-		addr:      addr,
-		wsProxy:   NewWebsocketReverseProxy(addr),
-		httpProxy: NewHTTPReverseProxy(addr, rpc),
+		addr:    addr,
+		wsProxy: NewWebsocketReverseProxy(addr),
+		httpProxy: NewHTTPReverseProxy(addr).
+			Register(qlservices.NewEthHeaderCidByBlockNumberService(rpc)),
 	}
 }
 
