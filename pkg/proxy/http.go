@@ -66,6 +66,7 @@ func NewHTTPReverseProxy(opts *Options) *HTTPReverseProxy {
 		return data, nil
 	}
 	proxy.polling = func(r *http.Request, uri *url.URL, body []byte, names []string) ([]byte, error) {
+		logrus.Infof("start %s.pooling", names[0])
 		type response struct {
 			data []byte
 			err  error
@@ -127,7 +128,7 @@ func (handler *HTTPReverseProxy) Register(srv Service) *HTTPReverseProxy {
 }
 
 func (handler *HTTPReverseProxy) getPQLURI(name string) *url.URL {
-	if name == "getGraphCallByTxHash" {
+	if name == "graphTransactionByTxHash" {
 		return handler.pqlTracing
 	}
 	return handler.pqlDefault
@@ -188,6 +189,7 @@ func (handler *HTTPReverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		go func(wg *sync.WaitGroup, doc []byte, name string, args []*ast.Argument) {
 			defer wg.Done()
 			if err := handler.services[name].Do(args); err != nil {
+				logrus.WithError(err).Errorf("%s.Do call", name)
 				return
 			}
 			uri := handler.getPQLURI(name)

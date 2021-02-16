@@ -12,19 +12,19 @@ import (
 	"github.com/valyala/fastjson"
 )
 
-type GetGraphCallByTxHashService struct {
+type GraphTransactionByTxHashService struct {
 	rpc *rpc.Client
 }
 
-func NewGetGraphCallByTxHashService(rpc *rpc.Client) *GetGraphCallByTxHashService {
-	return &GetGraphCallByTxHashService{rpc}
+func NewGetGraphCallByTxHashService(rpc *rpc.Client) *GraphTransactionByTxHashService {
+	return &GraphTransactionByTxHashService{rpc}
 }
 
-func (srv *GetGraphCallByTxHashService) Name() string {
-	return "getGraphCallByTxHash"
+func (srv *GraphTransactionByTxHashService) Name() string {
+	return "graphTransactionByTxHash"
 }
 
-func (srv *GetGraphCallByTxHashService) params(args []*ast.Argument) (common.Hash, error) {
+func (srv *GraphTransactionByTxHashService) params(args []*ast.Argument) (common.Hash, error) {
 	if len(args) == 0 {
 		return common.Hash{}, ErrNoArgs
 	}
@@ -35,26 +35,22 @@ func (srv *GetGraphCallByTxHashService) params(args []*ast.Argument) (common.Has
 	return common.HexToHash(value), nil
 }
 
-func (srv *GetGraphCallByTxHashService) Validate(args []*ast.Argument) error {
+func (srv *GraphTransactionByTxHashService) Validate(args []*ast.Argument) error {
 	_, err := srv.params(args)
 	return err
 }
 
-func (srv *GetGraphCallByTxHashService) IsEmpty(data []byte) (bool, error) {
+func (srv *GraphTransactionByTxHashService) IsEmpty(data []byte) (bool, error) {
 	json, err := fastjson.ParseBytes(data)
 	if err != nil {
 		return true, err
 	}
 
-	header := json.Get("data", "getGraphCallByTxHash")
-	if header == nil {
-		return true, nil
-	}
-
-	return false, nil
+	header := json.Get("data", "graphTransactionByTxHash")
+	return header == nil || header.Type() == fastjson.TypeNull, nil
 }
 
-func (srv *GetGraphCallByTxHashService) Do(args []*ast.Argument) error {
+func (srv *GraphTransactionByTxHashService) Do(args []*ast.Argument) error {
 	hash, err := srv.params(args)
 	if err != nil {
 		return err

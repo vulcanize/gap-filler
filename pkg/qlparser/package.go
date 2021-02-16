@@ -40,28 +40,31 @@ func QuerySplit(request []byte, names []string) ([]byte, map[string][]byte, erro
 	}
 
 	docs := make(map[string][]byte)
-	for i := range doc.Definitions {
+	for i := 0; i < len(doc.Definitions); i++ {
 		if doc.Definitions[i].GetKind() != "OperationDefinition" {
 			continue
 		}
 		opDef := doc.Definitions[i].(*ast.OperationDefinition)
-		for j := range opDef.SelectionSet.Selections {
+		for j := 0; j < len(opDef.SelectionSet.Selections); j++ {
 			field, ok := opDef.SelectionSet.Selections[j].(*ast.Field)
-			if ok && index[field.Name.Value] {
-				opd := new(ast.OperationDefinition)
-				copier.Copy(&opd, opDef)
-				opd.SelectionSet.Selections = []ast.Selection{field}
-
-				obj := arena.NewObject()
-				obj.Set("query", arena.NewString(printer.Print(opd).(string)))
-				obj.Set("variables", req.Get("variables"))
-				obj.Set("operationName", req.Get("operationName"))
-				docs[field.Name.Value] = []byte(obj.String())
-				opDef.SelectionSet.Selections = append(opDef.SelectionSet.Selections[:j], opDef.SelectionSet.Selections[j+1:]...)
+			if !ok || !index[field.Name.Value] {
+				continue
 			}
+			opd := new(ast.OperationDefinition)
+			copier.Copy(&opd, opDef)
+			opd.SelectionSet.Selections = []ast.Selection{field}
+
+			obj := arena.NewObject()
+			obj.Set("query", arena.NewString(printer.Print(opd).(string)))
+			obj.Set("variables", req.Get("variables"))
+			obj.Set("operationName", req.Get("operationName"))
+			docs[field.Name.Value] = []byte(obj.String())
+			opDef.SelectionSet.Selections = append(opDef.SelectionSet.Selections[:j], opDef.SelectionSet.Selections[j+1:]...)
+			j--
 		}
 		if len(opDef.SelectionSet.Selections) == 0 {
 			doc.Definitions = append(doc.Definitions[:i], doc.Definitions[i+1:]...)
+			i--
 		}
 	}
 
