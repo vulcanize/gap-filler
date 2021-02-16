@@ -4,10 +4,12 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
 	"github.com/graphql-go/graphql/language/ast"
+	"github.com/valyala/fastjson"
 	"github.com/vulcanize/gap-filler/pkg/qlservices"
 )
 
@@ -27,8 +29,8 @@ func (srv *EthHeaderCidByBlockNumberMockService) Do(args []*ast.Argument) error 
 
 func TestEthHeaderCidByBlockNumberEmptyBody(t *testing.T) {
 	proxy := NewHTTPReverseProxy(&Options{})
-	proxy.forward = func(body []byte) ([]byte, error) {
-		return []byte("some response"), nil
+	proxy.forward = func(uri *url.URL, body []byte) ([]byte, error) {
+		return []byte(`{"data":{}}`), nil
 	}
 
 	rr := httptest.NewRecorder()
@@ -42,8 +44,8 @@ func TestEthHeaderCidByBlockNumberEmptyBody(t *testing.T) {
 		t.Error(err)
 	}
 
-	if string(body) != "some response" {
-		t.Errorf("Want: 'some response', Got: '%s'", string(body))
+	if string(body) != `{"data":{}}` {
+		t.Errorf("Want: '{\"data\":{}}', Got: '%s'", string(body))
 	}
 }
 
@@ -66,7 +68,7 @@ func TestEthHeaderCidByBlockNumberSimple(t *testing.T) {
 		}
 	`
 	proxy := NewHTTPReverseProxy(&Options{})
-	proxy.forward = func(body []byte) ([]byte, error) {
+	proxy.forward = func(uri *url.URL, body []byte) ([]byte, error) {
 		return []byte(json), nil
 	}
 
@@ -81,7 +83,7 @@ func TestEthHeaderCidByBlockNumberSimple(t *testing.T) {
 		t.Error(err)
 	}
 
-	if strings.Compare(json, string(body)) != 0 {
+	if strings.Compare(fastjson.MustParse(json).String(), string(body)) != 0 {
 		t.Errorf("Want: %s, Got: '%s'", json, string(body))
 	}
 }
@@ -108,7 +110,7 @@ func TestEthHeaderCidByBlockNumberDataPulling(t *testing.T) {
 	proxy := NewHTTPReverseProxy(&Options{})
 	servi := NewEthHeaderCidByBlockNumberMockService()
 	proxy.Register(servi)
-	proxy.forward = func(body []byte) ([]byte, error) {
+	proxy.forward = func(uri *url.URL, body []byte) ([]byte, error) {
 		return []byte(`
 			{
 				"data": {
@@ -120,7 +122,7 @@ func TestEthHeaderCidByBlockNumberDataPulling(t *testing.T) {
 		`), nil
 	}
 
-	proxy.polling = func(r *http.Request, body []byte, names []string) ([]byte, error) {
+	proxy.polling = func(r *http.Request, uri *url.URL, body []byte, names []string) ([]byte, error) {
 		return []byte(json), nil
 	}
 
@@ -139,7 +141,7 @@ func TestEthHeaderCidByBlockNumberDataPulling(t *testing.T) {
 		t.Error("isReq2statediffCalled were not called")
 	}
 
-	if strings.Compare(json, string(body)) != 0 {
+	if strings.Compare(fastjson.MustParse(json).String(), string(body)) != 0 {
 		t.Errorf("Want: %s, Got: '%s'", json, string(body))
 	}
 }
