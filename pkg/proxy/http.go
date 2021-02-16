@@ -24,12 +24,11 @@ type Service interface {
 
 // HTTPReverseProxy it work with a regular HTTP request
 type HTTPReverseProxy struct {
-	tgDefault *url.URL
-	tgTracing *url.URL
-	client    *http.Client
-	forward   func(body []byte) ([]byte, error)
-	polling   func(r *http.Request, body []byte, names []string) ([]byte, error)
-
+	pqlDefault   *url.URL
+	pqlTracing   *url.URL
+	client       *http.Client
+	forward      func(uri *url.URL, body []byte) ([]byte, error)
+	polling      func(r *http.Request, uri *url.URL, body []byte, names []string) ([]byte, error)
 	mu           sync.Mutex
 	serviceNames []string
 	services     map[string]Service
@@ -41,14 +40,14 @@ func NewHTTPReverseProxy(opts *Options) *HTTPReverseProxy {
 		Timeout: 15 * time.Second,
 	}
 	proxy := HTTPReverseProxy{
-		tgDefault:    opts.Postgraphile.Default,
-		tgTracing:    opts.Postgraphile.TracingAPI,
+		pqlDefault:   opts.Postgraphile.Default,
+		pqlTracing:   opts.Postgraphile.TracingAPI,
 		client:       client,
 		serviceNames: make([]string, 0),
 		services:     make(map[string]Service),
 	}
-	proxy.forward = func(body []byte) ([]byte, error) {
-		req, err := http.NewRequest("POST", proxy.tgDefault.String(), bytes.NewReader(body))
+	proxy.forward = func(uri *url.URL, body []byte) ([]byte, error) {
+		req, err := http.NewRequest("POST", uri.String(), bytes.NewReader(body))
 		if err != nil {
 			return nil, err
 		}
@@ -66,7 +65,7 @@ func NewHTTPReverseProxy(opts *Options) *HTTPReverseProxy {
 
 		return data, nil
 	}
-	proxy.polling = func(r *http.Request, body []byte, names []string) ([]byte, error) {
+	proxy.polling = func(r *http.Request, uri *url.URL, body []byte, names []string) ([]byte, error) {
 		type response struct {
 			data []byte
 			err  error
@@ -80,7 +79,7 @@ func NewHTTPReverseProxy(opts *Options) *HTTPReverseProxy {
 				log := logrus.WithField("ticker", now)
 				log.Debug("trying to pull data")
 
-				data, err := proxy.forward(body)
+				data, err := proxy.forward(uri, body)
 				if err != nil {
 					log.WithError(err).Debug("have error after request to postgql")
 					ch <- response{err: err}
@@ -127,6 +126,13 @@ func (handler *HTTPReverseProxy) Register(srv Service) *HTTPReverseProxy {
 	return handler
 }
 
+func (handler *HTTPReverseProxy) getPQLURI(name string) *url.URL {
+	if name == "getGraphCallByTxHash" {
+		return handler.pqlTracing
+	}
+	return handler.pqlDefault
+}
+
 func (handler *HTTPReverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	reqBody, err := ioutil.ReadAll(r.Body)
 	if err != nil {
@@ -134,61 +140,72 @@ func (handler *HTTPReverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	defer r.Body.Close()
-	logrus.WithField("body", string(reqBody)).Debug("new request")
 
-	data, err := handler.forward(reqBody)
-	if err != nil {
-		logrus.WithError(err).Error("postgraphile first request request")
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	logrus.WithField("data", string(data)).Debug("postgraphile first request request")
+	ddoc, docs, err := qlparser.QuerySplit(reqBody, handler.serviceNames)
 
-	args, err := qlparser.QueryParams(fastjson.GetBytes(reqBody, "query"), handler.serviceNames)
-	if err != nil {
-		logrus.WithError(err).Error("can't parse graphQL queries and params")
-		w.Write(data)
-		return
-	}
-
-	emptyQueries := make([]string, 0)
-	for query := range args {
-		log := logrus.WithField("service", query)
-		if err := handler.services[query].Validate(args[query]); err != nil {
-			log.WithError(err).Error("bad arguments")
-			w.Write(data)
-			return
-		}
-		empty, err := handler.services[query].IsEmpty(data)
+	var data []byte
+	if ddoc == nil {
+		o := new(fastjson.Arena).NewObject()
+		o.Set("data", new(fastjson.Arena).NewObject())
+		data = []byte(o.String())
+	} else {
+		tmp, err := handler.forward(handler.pqlDefault, ddoc)
 		if err != nil {
-			log.WithError(err).Errorf("can't call %s.IsEmpty", query)
-			w.Write(data)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if empty {
-			emptyQueries = append(emptyQueries, query)
-		}
+		data = tmp
 	}
 
-	if len(emptyQueries) == 0 {
-		w.Write(data)
-		return
-	}
-
-	for _, query := range emptyQueries {
-		if err := handler.services[query].Do(args[query]); err != nil {
-			logrus.WithError(err).Errorf("can't call %s.Do", query)
-			w.Write(data)
+	parts := make(map[string][]byte)
+	for name := range docs {
+		uri := handler.getPQLURI(name)
+		tmp, err := handler.forward(uri, docs[name])
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		parts[name] = tmp
 	}
 
-	polledData, err := handler.polling(r, reqBody, emptyQueries)
-	if err != nil {
-		logrus.WithError(err).Error("have error after polling")
-		w.Write(data)
-		return
+	params := make(map[string][]*ast.Argument)
+	for name := range docs {
+		prms, err := qlparser.GetParams(fastjson.GetBytes(docs[name], "query"), name)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		params[name] = prms
 	}
 
-	w.Write(polledData)
+	wg := new(sync.WaitGroup)
+	for name := range docs {
+		isEmpty, _ := handler.services[name].IsEmpty(parts[name])
+		if !isEmpty {
+			continue
+		}
+		wg.Add(1)
+		go func(wg *sync.WaitGroup, doc []byte, name string, args []*ast.Argument) {
+			defer wg.Done()
+			if err := handler.services[name].Do(args); err != nil {
+				return
+			}
+			uri := handler.getPQLURI(name)
+			tmp, err := handler.polling(r, uri, doc, []string{name})
+			if err == nil {
+				parts[name] = tmp
+			}
+		}(wg, docs[name], name, params[name])
+	}
+	wg.Wait()
+
+	common := fastjson.MustParseBytes(data)
+	for name := range parts {
+		part := fastjson.MustParseBytes(parts[name])
+		data := common.Get("data")
+		data.Set(name, part.Get("data", name))
+		common.Set("data", data)
+	}
+
+	w.Write([]byte(common.String()))
 }

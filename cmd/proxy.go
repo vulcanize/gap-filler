@@ -19,23 +19,25 @@ var (
 			fmt.Println()
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			gqlAddr, err := url.Parse(viper.GetString("gql.target"))
+			gqlDefaultAddr, err := url.Parse(viper.GetString("gql.default"))
 			if err != nil {
 				return err
 			}
 
-			gqlTracingAPIAddr, err := url.Parse(viper.GetString("gql.target"))
+			gqlTracingAPIAddr, err := url.Parse(viper.GetString("gql.tracing"))
 			if err != nil {
 				return err
 			}
 
-			rpcClient, err := rpc.Dial(viper.GetString("eth.rpc"))
+			rpcClient, err := rpc.Dial(viper.GetString("rpc.eth"))
 			if err != nil {
+				logrus.Error("bad eth.rpc address")
 				return err
 			}
 
-			tracingClient, err := rpc.Dial(viper.GetString("tracingapi.rpc"))
+			tracingClient, err := rpc.Dial(viper.GetString("rpc.tracing"))
 			if err != nil {
+				logrus.Error("bad tracingapi.rpc address")
 				return err
 			}
 
@@ -43,7 +45,7 @@ var (
 				BasePath:       viper.GetString("http.path"),
 				EnableGraphiQL: viper.GetBool("gql.gui"),
 				Postgraphile: mux.PostgraphileOptions{
-					Default:    gqlAddr,
+					Default:    gqlDefaultAddr,
 					TracingAPI: gqlTracingAPIAddr,
 				},
 				RPC: mux.RPCOptions{
@@ -70,11 +72,11 @@ func init() {
 	proxyCmd.PersistentFlags().String("http-port", "8080", "http port")
 	proxyCmd.PersistentFlags().String("http-path", "/", "http base path")
 
-	proxyCmd.PersistentFlags().String("eth-rpc", "http://127.0.0.1:8545", "ethereum rpc address")
-	proxyCmd.PersistentFlags().String("tracing-rpc", "http://127.0.0.1:8545", "traicing api address")
+	proxyCmd.PersistentFlags().String("rpc-eth", "http://127.0.0.1:8545", "ethereum rpc address")
+	proxyCmd.PersistentFlags().String("rpc-tracing", "http://127.0.0.1:8545", "traicing api address")
 
-	proxyCmd.PersistentFlags().String("gql-target", "http://127.0.0.1:5020/graphql", "postgraphile address")
-	proxyCmd.PersistentFlags().String("gql-target-tracingapi", "http://127.0.0.1:5020/graphql", "tracing api postgraphile address")
+	proxyCmd.PersistentFlags().String("gql-default", "http://127.0.0.1:5020/graphql", "postgraphile address")
+	proxyCmd.PersistentFlags().String("gql-tracing", "http://127.0.0.1:5020/graphql", "tracing api postgraphile address")
 	proxyCmd.PersistentFlags().Bool("gql-gui", false, "enable graphiql interface")
 
 	// and their .toml config bindings
@@ -82,10 +84,10 @@ func init() {
 	viper.BindPFlag("http.port", proxyCmd.PersistentFlags().Lookup("http-port"))
 	viper.BindPFlag("http.path", proxyCmd.PersistentFlags().Lookup("http-path"))
 
-	viper.BindPFlag("eth.rpc", proxyCmd.PersistentFlags().Lookup("eth-rpc"))
-	viper.BindPFlag("tracing.rpc", proxyCmd.PersistentFlags().Lookup("tracing-rpc"))
+	viper.BindPFlag("rpc.eth", proxyCmd.PersistentFlags().Lookup("rpc-eth"))
+	viper.BindPFlag("rpc.tracing", proxyCmd.PersistentFlags().Lookup("rpc-tracing"))
 
-	viper.BindPFlag("gql.target", proxyCmd.PersistentFlags().Lookup("gql-target"))
-	viper.BindPFlag("gql.target.tracingapi", proxyCmd.PersistentFlags().Lookup("gql-target-tracingapi"))
+	viper.BindPFlag("gql.default", proxyCmd.PersistentFlags().Lookup("gql-default"))
+	viper.BindPFlag("gql.tracing", proxyCmd.PersistentFlags().Lookup("gql-tracing"))
 	viper.BindPFlag("gql.gui", proxyCmd.PersistentFlags().Lookup("gql-gui"))
 }
