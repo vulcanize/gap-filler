@@ -6,6 +6,7 @@ require (
 	github.com/ethereum/go-ethereum v1.9.11
 	github.com/friendsofgo/graphiql v0.2.2
 	github.com/graphql-go/graphql v0.7.9
+	github.com/jinzhu/copier v0.2.4
 	github.com/sirupsen/logrus v1.7.0
 	github.com/spf13/cobra v1.1.1
 	github.com/spf13/viper v1.7.0
