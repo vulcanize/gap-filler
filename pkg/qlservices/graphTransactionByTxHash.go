@@ -6,18 +6,17 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/graphql-go/graphql/language/ast"
 	"github.com/sirupsen/logrus"
 	"github.com/valyala/fastjson"
 )
 
 type GraphTransactionByTxHashService struct {
-	rpc *rpc.Client
+	balancer Balancer
 }
 
-func NewGetGraphCallByTxHashService(rpc *rpc.Client) *GraphTransactionByTxHashService {
-	return &GraphTransactionByTxHashService{rpc}
+func NewGetGraphCallByTxHashService(balancer Balancer) *GraphTransactionByTxHashService {
+	return &GraphTransactionByTxHashService{balancer}
 }
 
 func (srv *GraphTransactionByTxHashService) Name() string {
@@ -63,7 +62,7 @@ func (srv *GraphTransactionByTxHashService) Do(args []*ast.Argument) error {
 
 	var data json.RawMessage
 	log.Debug("call debug_writeTxTraceGraph")
-	if err := srv.rpc.CallContext(ctx, &data, "debug_writeTxTraceGraph", hash.Hex()); err != nil {
+	if err := srv.balancer.Next().CallContext(ctx, &data, "debug_writeTxTraceGraph", hash.Hex()); err != nil {
 		log.WithError(err).Debug("bad debug_writeTxTraceGraph request")
 		return err
 	}

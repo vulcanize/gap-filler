@@ -6,7 +6,6 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/go-ethereum/statediff"
 	"github.com/graphql-go/graphql/language/ast"
 	"github.com/sirupsen/logrus"
@@ -14,11 +13,11 @@ import (
 )
 
 type EthHeaderCidByBlockNumberService struct {
-	rpc *rpc.Client
+	balancer Balancer
 }
 
-func NewEthHeaderCidByBlockNumberService(rpc *rpc.Client) *EthHeaderCidByBlockNumberService {
-	return &EthHeaderCidByBlockNumberService{rpc}
+func NewEthHeaderCidByBlockNumberService(balancer Balancer) *EthHeaderCidByBlockNumberService {
+	return &EthHeaderCidByBlockNumberService{balancer}
 }
 
 func (srv *EthHeaderCidByBlockNumberService) Name() string {
@@ -102,7 +101,7 @@ func (srv *EthHeaderCidByBlockNumberService) Do(args []*ast.Argument) error {
 		"params": params,
 	})
 	log.Debug("call statediff_stateDiffAt")
-	if err := srv.rpc.CallContext(ctx, &data, "statediff_writeStateDiffAt", n.Uint64(), params); err != nil {
+	if err := srv.balancer.Next().CallContext(ctx, &data, "statediff_writeStateDiffAt", n.Uint64(), params); err != nil {
 		log.WithError(err).Debug("bad statediff_writeStateDiffAt request")
 		return err
 	}

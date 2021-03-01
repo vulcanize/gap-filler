@@ -22,7 +22,8 @@ After building the binary, run as
 |-------------|--------------------|-----------------------------|
 | GQL_TARGET   | http://127.0.0.1:5020/graphql            | URL of source Postgraphile          |
 | GQL_GUI   | false            | Enable graphiql interface          |
-| ETH_RPC        | http://127.0.0.1:8545               | Ethereum rpc address           |
+| RPC_ETH        | http://127.0.0.1:8545               | Comma separated Ethereum rpc addresses           |
+| RPC_TRACING        | http://127.0.0.1:8545               | Comma separated Ethereum rpc addresses           |
 | HTTP_HOST      | 127.0.0.1         | Gap-filler host |
 | HTTP-PORT     | 8080               | Gap-filler port            |
 | HTTP-PATH     | /               | Gap-filler base path. Result URL is `http://$HTTP_HOST:$HTTP-PORT$HTTP-PATH/graphql`            |
