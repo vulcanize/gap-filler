@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/vulcanize/gap-filler/pkg/qlservices"
 )
 
@@ -20,8 +19,8 @@ type PostgraphileOptions struct {
 }
 
 type RPCOptions struct {
-	Default *rpc.Client
-	Tracing *rpc.Client
+	DefaultBalancer qlservices.Balancer
+	TracingBalancer qlservices.Balancer
 }
 
 type Options struct {
@@ -34,8 +33,8 @@ func New(opts *Options) *Proxy {
 	return &Proxy{
 		wsProxy: NewWebsocketReverseProxy(opts.Postgraphile.Default),
 		httpProxy: NewHTTPReverseProxy(opts).
-			Register(qlservices.NewEthHeaderCidByBlockNumberService(opts.RPC.Default)).
-			Register(qlservices.NewGetGraphCallByTxHashService(opts.RPC.Tracing)),
+			Register(qlservices.NewEthHeaderCidByBlockNumberService(opts.RPC.DefaultBalancer)).
+			Register(qlservices.NewGetGraphCallByTxHashService(opts.RPC.TracingBalancer)),
 	}
 }
 
