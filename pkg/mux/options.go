@@ -1,8 +1,9 @@
 package mux
 
 import (
-	"github.com/vulcanize/gap-filler/pkg/qlservices"
 	"net/url"
+
+	"github.com/ethereum/go-ethereum/rpc"
 )
 
 type PostgraphileOptions struct {
@@ -11,8 +12,8 @@ type PostgraphileOptions struct {
 }
 
 type RPCOptions struct {
-	DefaultBalancer qlservices.Balancer
-	TracingBalancer qlservices.Balancer
+	DefaultClients []*rpc.Client
+	TracingClients []*rpc.Client
 }
 
 // Options configurations for proxy service

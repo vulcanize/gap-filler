@@ -12,7 +12,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/vulcanize/gap-filler/pkg/mux"
-	"github.com/vulcanize/gap-filler/pkg/qlservices"
 )
 
 var (
@@ -40,19 +39,9 @@ var (
 				return err
 			}
 
-			rpcBalancer, err := qlservices.NewBalancer(rpcClients)
-			if err != nil {
-				return err
-			}
-
 			tracingClients, err := parseRpcAddresses(viper.GetString("rpc.tracing"))
 			if err != nil {
 				logrus.Error("bad rpc.tracing addresses")
-				return err
-			}
-
-			tracingBalancer, err := qlservices.NewBalancer(tracingClients)
-			if err != nil {
 				return err
 			}
 
@@ -64,8 +53,8 @@ var (
 					TracingAPI: gqlTracingAPIAddr,
 				},
 				RPC: mux.RPCOptions{
-					DefaultBalancer: rpcBalancer,
-					TracingBalancer: tracingBalancer,
+					DefaultClients: rpcClients,
+					TracingClients: tracingClients,
 				},
 			})
 			if err != nil {

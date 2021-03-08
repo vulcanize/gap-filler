@@ -6,17 +6,19 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/graphql-go/graphql/language/ast"
 	"github.com/sirupsen/logrus"
 	"github.com/valyala/fastjson"
 )
 
 type GraphTransactionByTxHashService struct {
-	balancer Balancer
+	number  int
+	clients []*rpc.Client
 }
 
-func NewGetGraphCallByTxHashService(balancer Balancer) *GraphTransactionByTxHashService {
-	return &GraphTransactionByTxHashService{balancer}
+func NewGetGraphCallByTxHashService(clients []*rpc.Client) *GraphTransactionByTxHashService {
+	return &GraphTransactionByTxHashService{clients: clients}
 }
 
 func (srv *GraphTransactionByTxHashService) Name() string {
@@ -59,13 +61,25 @@ func (srv *GraphTransactionByTxHashService) Do(args []*ast.Argument) error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-
 	var data json.RawMessage
 	log.Debug("call debug_writeTxTraceGraph")
-	if err := srv.balancer.Next().CallContext(ctx, &data, "debug_writeTxTraceGraph", hash.Hex()); err != nil {
+
+	// since the clients are not being modified after initialization, it is safe to iterate over this list in separate goroutines
+	for _, client := range srv.clients {
+		// if deadline has been reached, break
+		// otherwise it'd keep calling the rest of the clients with the exhausted deadline
+		select {
+		case <-ctx.Done():
+			return DeadlineReached
+		default:
+		}
+		err = client.CallContext(ctx, &data, "debug_writeTxTraceGraph", hash.Hex())
+		if err == nil {
+			log.WithField("resp", data).Debug("debug_writeTxTraceGraph result")
+			return nil
+		}
 		log.WithError(err).Debug("bad debug_writeTxTraceGraph request")
-		return err
 	}
-	log.WithField("resp", data).Debug("debug_writeTxTraceGraph result")
-	return nil
+
+	return err
 }

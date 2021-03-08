@@ -3,21 +3,25 @@ package qlservices
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/go-ethereum/statediff"
 	"github.com/graphql-go/graphql/language/ast"
 	"github.com/sirupsen/logrus"
 	"github.com/valyala/fastjson"
 )
 
+var DeadlineReached = errors.New("context deadline reached")
+
 type EthHeaderCidByBlockNumberService struct {
-	balancer Balancer
+	clients []*rpc.Client
 }
 
-func NewEthHeaderCidByBlockNumberService(balancer Balancer) *EthHeaderCidByBlockNumberService {
-	return &EthHeaderCidByBlockNumberService{balancer}
+func NewEthHeaderCidByBlockNumberService(clients []*rpc.Client) *EthHeaderCidByBlockNumberService {
+	return &EthHeaderCidByBlockNumberService{clients: clients}
 }
 
 func (srv *EthHeaderCidByBlockNumberService) Name() string {
@@ -101,10 +105,23 @@ func (srv *EthHeaderCidByBlockNumberService) Do(args []*ast.Argument) error {
 		"params": params,
 	})
 	log.Debug("call statediff_stateDiffAt")
-	if err := srv.balancer.Next().CallContext(ctx, &data, "statediff_writeStateDiffAt", n.Uint64(), params); err != nil {
+
+	// since the clients are not being modified after initialization, it is safe to iterate over this list in separate goroutines
+	for _, client := range srv.clients {
+		// if deadline has been reached, break
+		// otherwise it'd keep calling the rest of the clients with the exhausted deadline
+		select {
+		case <-ctx.Done():
+			return DeadlineReached
+		default:
+		}
+		err = client.CallContext(ctx, &data, "statediff_writeStateDiffAt", n.Uint64(), params)
+		if err == nil {
+			log.WithField("resp", data).Debug("statediff_writeStateDiffAt result")
+			return nil
+		}
 		log.WithError(err).Debug("bad statediff_writeStateDiffAt request")
-		return err
 	}
-	log.WithField("resp", data).Debug("statediff_writeStateDiffAt result")
-	return nil
+
+	return err
 }
