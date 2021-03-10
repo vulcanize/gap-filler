@@ -3,7 +3,6 @@ package qlservices
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"math/big"
 	"time"
 
@@ -14,7 +13,7 @@ import (
 	"github.com/valyala/fastjson"
 )
 
-var DeadlineReached = errors.New("context deadline reached")
+var stateDiffMethod = "statediff_writeStateDiffAt"
 
 type EthHeaderCidByBlockNumberService struct {
 	clients []*rpc.Client
@@ -28,7 +27,7 @@ func (srv *EthHeaderCidByBlockNumberService) Name() string {
 	return "ethHeaderCidByBlockNumber"
 }
 
-func (srv *EthHeaderCidByBlockNumberService) params(args []*ast.Argument) (*big.Int, error) {
+func (srv *EthHeaderCidByBlockNumberService) args(args []*ast.Argument) (*big.Int, error) {
 	if len(args) == 0 {
 		return nil, ErrNoArgs
 	}
@@ -44,7 +43,7 @@ func (srv *EthHeaderCidByBlockNumberService) params(args []*ast.Argument) (*big.
 }
 
 func (srv *EthHeaderCidByBlockNumberService) Validate(args []*ast.Argument) error {
-	_, err := srv.params(args)
+	_, err := srv.args(args)
 	return err
 }
 
@@ -82,16 +81,10 @@ func (srv *EthHeaderCidByBlockNumberService) IsEmpty(data []byte) (bool, error) 
 }
 
 func (srv *EthHeaderCidByBlockNumberService) Do(args []*ast.Argument) error {
-	n, err := srv.params(args)
+	n, err := srv.args(args)
 	if err != nil {
 		return err
 	}
-	logrus.WithField("blockNum", n).Debug("do request to geth")
-
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
-	var data json.RawMessage
 	params := statediff.Params{
 		IntermediateStateNodes:   true,
 		IntermediateStorageNodes: true,
@@ -101,27 +94,14 @@ func (srv *EthHeaderCidByBlockNumberService) Do(args []*ast.Argument) error {
 		IncludeCode:              true,
 	}
 	log := logrus.WithFields(logrus.Fields{
-		"n":      n,
-		"params": params,
+		"blockNum": n,
+		"params":   params,
 	})
-	log.Debug("call statediff_stateDiffAt")
+	log.Debug("do request to Geth")
 
-	// since the clients are not being modified after initialization, it is safe to iterate over this list in separate goroutines
-	for _, client := range srv.clients {
-		// if deadline has been reached, break
-		// otherwise it'd keep calling the rest of the clients with the exhausted deadline
-		select {
-		case <-ctx.Done():
-			return DeadlineReached
-		default:
-		}
-		err = client.CallContext(ctx, &data, "statediff_writeStateDiffAt", n.Uint64(), params)
-		if err == nil {
-			log.WithField("resp", data).Debug("statediff_writeStateDiffAt result")
-			return nil
-		}
-		log.WithError(err).Debug("bad statediff_writeStateDiffAt request")
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	var data json.RawMessage
 
-	return err
+	return proxyCallContext(srv.clients, log, ctx, &data, stateDiffMethod, n.Uint64(), params)
 }

@@ -12,6 +12,8 @@ import (
 	"github.com/valyala/fastjson"
 )
 
+var traceMethod = "debug_writeTxTraceGraph"
+
 type GraphTransactionByTxHashService struct {
 	number  int
 	clients []*rpc.Client
@@ -57,29 +59,11 @@ func (srv *GraphTransactionByTxHashService) Do(args []*ast.Argument) error {
 		return err
 	}
 	log := logrus.WithField("hash", hash.Hex())
-	log.Debug("do request to geth")
+	log.Debug("do request to Geth")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	var data json.RawMessage
-	log.Debug("call debug_writeTxTraceGraph")
 
-	// since the clients are not being modified after initialization, it is safe to iterate over this list in separate goroutines
-	for _, client := range srv.clients {
-		// if deadline has been reached, break
-		// otherwise it'd keep calling the rest of the clients with the exhausted deadline
-		select {
-		case <-ctx.Done():
-			return DeadlineReached
-		default:
-		}
-		err = client.CallContext(ctx, &data, "debug_writeTxTraceGraph", hash.Hex())
-		if err == nil {
-			log.WithField("resp", data).Debug("debug_writeTxTraceGraph result")
-			return nil
-		}
-		log.WithError(err).Debug("bad debug_writeTxTraceGraph request")
-	}
-
-	return err
+	return proxyCallContext(srv.clients, log, ctx, &data, traceMethod, hash.Hex())
 }
