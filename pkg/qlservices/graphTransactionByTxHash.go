@@ -6,17 +6,21 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/graphql-go/graphql/language/ast"
 	"github.com/sirupsen/logrus"
 	"github.com/valyala/fastjson"
 )
 
+var traceMethod = "debug_writeTxTraceGraph"
+
 type GraphTransactionByTxHashService struct {
-	balancer Balancer
+	number  int
+	clients []*rpc.Client
 }
 
-func NewGetGraphCallByTxHashService(balancer Balancer) *GraphTransactionByTxHashService {
-	return &GraphTransactionByTxHashService{balancer}
+func NewGetGraphCallByTxHashService(clients []*rpc.Client) *GraphTransactionByTxHashService {
+	return &GraphTransactionByTxHashService{clients: clients}
 }
 
 func (srv *GraphTransactionByTxHashService) Name() string {
@@ -55,17 +59,11 @@ func (srv *GraphTransactionByTxHashService) Do(args []*ast.Argument) error {
 		return err
 	}
 	log := logrus.WithField("hash", hash.Hex())
-	log.Debug("do request to geth")
+	log.Debug("do request to Geth")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-
 	var data json.RawMessage
-	log.Debug("call debug_writeTxTraceGraph")
-	if err := srv.balancer.Next().CallContext(ctx, &data, "debug_writeTxTraceGraph", hash.Hex()); err != nil {
-		log.WithError(err).Debug("bad debug_writeTxTraceGraph request")
-		return err
-	}
-	log.WithField("resp", data).Debug("debug_writeTxTraceGraph result")
-	return nil
+
+	return proxyCallContext(srv.clients, log, ctx, &data, traceMethod, hash.Hex())
 }

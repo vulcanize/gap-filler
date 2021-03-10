@@ -6,25 +6,28 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/go-ethereum/statediff"
 	"github.com/graphql-go/graphql/language/ast"
 	"github.com/sirupsen/logrus"
 	"github.com/valyala/fastjson"
 )
 
+var stateDiffMethod = "statediff_writeStateDiffAt"
+
 type EthHeaderCidByBlockNumberService struct {
-	balancer Balancer
+	clients []*rpc.Client
 }
 
-func NewEthHeaderCidByBlockNumberService(balancer Balancer) *EthHeaderCidByBlockNumberService {
-	return &EthHeaderCidByBlockNumberService{balancer}
+func NewEthHeaderCidByBlockNumberService(clients []*rpc.Client) *EthHeaderCidByBlockNumberService {
+	return &EthHeaderCidByBlockNumberService{clients: clients}
 }
 
 func (srv *EthHeaderCidByBlockNumberService) Name() string {
 	return "ethHeaderCidByBlockNumber"
 }
 
-func (srv *EthHeaderCidByBlockNumberService) params(args []*ast.Argument) (*big.Int, error) {
+func (srv *EthHeaderCidByBlockNumberService) args(args []*ast.Argument) (*big.Int, error) {
 	if len(args) == 0 {
 		return nil, ErrNoArgs
 	}
@@ -40,7 +43,7 @@ func (srv *EthHeaderCidByBlockNumberService) params(args []*ast.Argument) (*big.
 }
 
 func (srv *EthHeaderCidByBlockNumberService) Validate(args []*ast.Argument) error {
-	_, err := srv.params(args)
+	_, err := srv.args(args)
 	return err
 }
 
@@ -78,16 +81,10 @@ func (srv *EthHeaderCidByBlockNumberService) IsEmpty(data []byte) (bool, error) 
 }
 
 func (srv *EthHeaderCidByBlockNumberService) Do(args []*ast.Argument) error {
-	n, err := srv.params(args)
+	n, err := srv.args(args)
 	if err != nil {
 		return err
 	}
-	logrus.WithField("blockNum", n).Debug("do request to geth")
-
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
-	var data json.RawMessage
 	params := statediff.Params{
 		IntermediateStateNodes:   true,
 		IntermediateStorageNodes: true,
@@ -97,14 +94,14 @@ func (srv *EthHeaderCidByBlockNumberService) Do(args []*ast.Argument) error {
 		IncludeCode:              true,
 	}
 	log := logrus.WithFields(logrus.Fields{
-		"n":      n,
-		"params": params,
+		"blockNum": n,
+		"params":   params,
 	})
-	log.Debug("call statediff_stateDiffAt")
-	if err := srv.balancer.Next().CallContext(ctx, &data, "statediff_writeStateDiffAt", n.Uint64(), params); err != nil {
-		log.WithError(err).Debug("bad statediff_writeStateDiffAt request")
-		return err
-	}
-	log.WithField("resp", data).Debug("statediff_writeStateDiffAt result")
-	return nil
+	log.Debug("do request to Geth")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	var data json.RawMessage
+
+	return proxyCallContext(srv.clients, log, ctx, &data, stateDiffMethod, n.Uint64(), params)
 }

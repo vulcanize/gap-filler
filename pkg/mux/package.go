@@ -22,8 +22,8 @@ func NewServeMux(opts *Options) (*http.ServeMux, error) {
 
 	mux.Handle(path.Join(opts.BasePath, "/graphql"), proxy.New(&proxy.Options{
 		RPC: proxy.RPCOptions{
-			DefaultBalancer: opts.RPC.DefaultBalancer,
-			TracingBalancer: opts.RPC.TracingBalancer,
+			DefaultClients: opts.RPC.DefaultClients,
+			TracingClients: opts.RPC.TracingClients,
 		},
 		Postgraphile: proxy.PostgraphileOptions{
 			Default:    opts.Postgraphile.Default,
