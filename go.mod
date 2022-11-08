@@ -3,7 +3,7 @@ module github.com/vulcanize/gap-filler
 go 1.18
 
 require (
-	github.com/ethereum/go-ethereum v1.10.25
+	github.com/ethereum/go-ethereum v1.10.26
 	github.com/friendsofgo/graphiql v0.2.2
 	github.com/graphql-go/graphql v0.7.9
 	github.com/jinzhu/copier v0.2.4
@@ -122,4 +122,4 @@ require (
 	lukechampine.com/blake3 v1.1.6 // indirect
 )
 
-replace github.com/ethereum/go-ethereum v1.10.25 => github.com/cerc-io/go-ethereum v1.10.25-statediff-4.2.1-alpha
+replace github.com/ethereum/go-ethereum v1.10.26 => github.com/cerc-io/go-ethereum v1.10.26-statediff-4.2.2-alpha
