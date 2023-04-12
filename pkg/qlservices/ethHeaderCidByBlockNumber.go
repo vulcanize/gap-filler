@@ -86,12 +86,10 @@ func (srv *EthHeaderCidByBlockNumberService) Do(args []*ast.Argument) error {
 		return err
 	}
 	params := statediff.Params{
-		IntermediateStateNodes:   true,
-		IntermediateStorageNodes: true,
-		IncludeBlock:             true,
-		IncludeReceipts:          true,
-		IncludeTD:                true,
-		IncludeCode:              true,
+		IncludeBlock:    true,
+		IncludeReceipts: true,
+		IncludeTD:       true,
+		IncludeCode:     true,
 	}
 	log := logrus.WithFields(logrus.Fields{
 		"blockNum": n,
